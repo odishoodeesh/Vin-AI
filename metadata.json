@@ -1,0 +1,7 @@
+{
+  "name": "Vin AI",
+  "description": "Upload your AI influencer character and instantly generate 5 professional, high-converting ad campaigns with targeting strategies, hooks, and captions.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
