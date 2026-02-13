@@ -4,12 +4,17 @@ import { AdCampaign, AdGenerationResponse } from "../types";
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+/**
+ * Creates a fresh AI client instance. 
+ * As per instructions, we create a new instance before each call 
+ * to ensure it picks up the latest key from the selection dialog.
+ */
 const getAIClient = () => {
   return new GoogleGenAI({ apiKey: process.env.API_KEY });
 };
 
 /**
- * Wraps an API call with retry logic for 429 errors.
+ * Wraps an API call with retry logic for 429 and 500 errors.
  */
 const withRetry = async <T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> => {
   let lastError: any;
@@ -19,12 +24,10 @@ const withRetry = async <T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> =>
     } catch (err: any) {
       lastError = err;
       const errorMsg = err?.message || JSON.stringify(err);
-      const isQuotaError = errorMsg.includes('429') || errorMsg.includes('RESOURCE_EXHAUSTED');
+      const isRetryable = errorMsg.includes('429') || errorMsg.includes('RESOURCE_EXHAUSTED') || errorMsg.includes('500');
       
-      if (isQuotaError && i < maxRetries - 1) {
-        // Exponential backoff: 2s, 5s, 10s
+      if (isRetryable && i < maxRetries - 1) {
         const delay = (i + 1) * 3000 + Math.random() * 1000;
-        console.warn(`Quota exceeded (429), retrying in ${Math.round(delay)}ms (Attempt ${i + 1}/${maxRetries})...`);
         await sleep(delay);
         continue;
       }
@@ -43,38 +46,30 @@ export const generateAdCampaigns = async (
   const base64Data = imageB64.split(',')[1] || imageB64;
   
   const styleInstruction = style === 'Random' 
-    ? "various diverse professional settings" 
-    : `specifically centered around the theme: "${style}"`;
+    ? "various diverse high-end professional lifestyle settings" 
+    : `specifically centered around the elite professional theme: "${style}"`;
 
+  // We use gemini-3-pro-preview with a thinking budget for superior creative strategy
   const strategyPrompt = `
-    Act as a world-class creative director. Analyze this AI influencer character.
-    Create 5 professional ad concepts. The ads should be ${styleInstruction}.
+    Act as a world-class High-Fashion Creative Director. 
+    1. Analyze the character in this image for brand DNA, aesthetic, and demographic appeal.
+    2. Create a "Influencer Brand Identity" summary (1-2 sentences).
+    3. Create 5 professional ad concepts optimized for Instagram/TikTok. The ads must be ${styleInstruction}.
     
-    For EACH concept, provide a highly detailed "imagePrompt" intended for an image generation model. 
+    Each concept must have:
+    - A 'title' (The campaign name)
+    - A 'platform' (Reels, TikTok, or YouTube Shorts)
+    - A 'hook' (The opening text overlay)
+    - A 'caption' (Engaging marketing copy with hashtags)
+    - A 'visualConcept' (Description of the scene)
+    - A 'tone' (e.g., Luxury, Relatable, High-Energy)
+    - A 'imagePrompt': A detailed technical prompt for an image model. Describe the EXACT character from the reference photo in the new setting. Include technical specs: "8k, professional photography, cinematic lighting, shot on 35mm, realistic skin textures, 9:16 aspect ratio".
     
-    CRITICAL: 
-    - The theme for all images must be: ${style}. 
-    - The imagePrompt must describe the character from the attached image in this ${style} setting.
-    - If style is 'Mirror selfie', describe the character holding a high-end smartphone in front of a mirror.
-    - If style is 'Gym', focus on premium athletic gear and fitness settings.
-    - If style is 'Gen Z outfit', focus on Y2K, baggy streetwear, and modern trend aesthetics.
-    - If style is 'Coffee', focus on aesthetic cafes, latte art, and cozy morning vibes.
-    - If style is 'Dress', focus on high-fashion evening gowns, elegant gala settings, and luxury red carpet aesthetics.
-    - If style is 'Hotel room', focus on high-end boutique hotel suites, plush white linens, panoramic city views, and intimate, relaxed atmospheres.
-    - If style is 'Sexy', focus on bold, sophisticated allure, sultry lighting, confident poses, and high-fashion glam photography.
-    - If style is 'Disposable Cam', use keywords: 35mm film, direct flash, disposable camera vibes, vintage grain, dated timestamp, hard shadows, high contrast.
-    - If style is 'Street Snap', use keywords: Candid motion, street photography, shot on iPhone, blurred urban background, realistic skin texture, mid-motion walking.
-    - If style is 'Home Body', use keywords: Soft indoor lighting, messy/authentic domestic background, casual no-filter vibes, unedited look, relaxed morning pose.
-    - If style is 'Golden Hour', use keywords: Sunset lighting, golden hour glow, backlit skin, warm color palette, soft lens flares, main character energy.
-    - If style is 'Car Seat', use keywords: Car interior, side-window lighting, seatbelt, natural sunlight through glass, dramatic side-shadows, intimate frame.
-    
-    Ensure the prompt mentions maintaining the character's facial features and hair style from the reference image. 
-    The goal is 9:16 "Story/Reels" style professional photography.
+    CRITICAL: Ensure the character's facial features and signature hair from the photo are preserved.
   `;
 
-  // Fix: Explicitly typed response to resolve 'unknown' property errors
   const strategyResponse: GenerateContentResponse = await withRetry(() => ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
+    model: 'gemini-3-pro-preview',
     contents: {
       parts: [
         { inlineData: { mimeType: 'image/jpeg', data: base64Data } },
@@ -82,6 +77,8 @@ export const generateAdCampaigns = async (
       ],
     },
     config: {
+      // Use thinking budget for better reasoning
+      thinkingConfig: { thinkingBudget: 16384 },
       responseMimeType: "application/json",
       responseSchema: {
         type: Type.OBJECT,
@@ -100,7 +97,7 @@ export const generateAdCampaigns = async (
                 caption: { type: Type.STRING },
                 visualConcept: { type: Type.STRING },
                 tone: { type: Type.STRING },
-                imagePrompt: { type: Type.STRING, description: "Detailed prompt for generating the ad image." }
+                imagePrompt: { type: Type.STRING }
               },
               required: ["id", "title", "platform", "audience", "hook", "caption", "visualConcept", "tone", "imagePrompt"]
             }
@@ -112,31 +109,32 @@ export const generateAdCampaigns = async (
   }));
 
   const strategyText = strategyResponse.text;
-  if (!strategyText) throw new Error("No strategy response from AI");
+  if (!strategyText) throw new Error("No response from Creative Strategy model.");
   const result = JSON.parse(strategyText) as AdGenerationResponse;
 
   const campaignsWithImages: AdCampaign[] = [];
   
+  // We generate images sequentially to avoid burst limit errors on Vercel/Gemini API
   for (let i = 0; i < result.campaigns.length; i++) {
     onProgress(i);
     const campaign = result.campaigns[i];
     
-    // Add a small delay between requests to avoid hitting immediate burst limits
-    if (i > 0) await sleep(1000);
+    if (i > 0) await sleep(500); // Tiny pause between generations
 
     try {
-      // Fix: Explicitly typed response to resolve 'unknown' property errors
+      // Use gemini-3-pro-image-preview for professional 1K quality
       const imageResponse: GenerateContentResponse = await withRetry(() => ai.models.generateContent({
-        model: 'gemini-2.5-flash-image',
+        model: 'gemini-3-pro-image-preview',
         contents: {
           parts: [
             { inlineData: { mimeType: 'image/jpeg', data: base64Data } },
-            { text: `Create a professional 9:16 advertisement image. Concept: ${campaign.imagePrompt}. Subject must be the exact character from the reference image. Style: High-end professional photography, 8k, cinematic lighting.` }
+            { text: `GENERATE AD IMAGE: ${campaign.imagePrompt}. Ensure the subject is the same person as the provided reference image. HIGH QUALITY ADVERT.` }
           ]
         },
         config: {
           imageConfig: {
-            aspectRatio: "9:16"
+            aspectRatio: "9:16",
+            imageSize: "1K"
           }
         }
       }));
@@ -151,7 +149,7 @@ export const generateAdCampaigns = async (
         campaignsWithImages.push(campaign);
       }
     } catch (err) {
-      console.error(`Failed to generate image for campaign ${i}`, err);
+      console.error(`Failed to generate high-res image for campaign ${i}`, err);
       campaignsWithImages.push(campaign);
     }
   }
@@ -171,20 +169,11 @@ export const generateSingleAdCampaign = async (
   const base64Data = imageB64.split(',')[1] || imageB64;
 
   const strategyPrompt = `
-    Act as a creative director. Analyze the character. Create ONE additional professional ad concept. 
-    Theme: ${style}. 
-    Output should be JSON for ONE campaign object.
-    
-    If theme is 'Disposable Cam', use keywords: 35mm film, direct flash, vintage grain.
-    If theme is 'Street Snap', use keywords: Candid motion, urban, iPhone-look.
-    If theme is 'Home Body', use keywords: Soft indoor, authentic domestic, casual.
-    If theme is 'Golden Hour', use keywords: Sunset, backlit, warm glow.
-    If theme is 'Car Seat', use keywords: Car interior, side-window sun, dramatic shadows.
+    Create ONE premium ad concept. Theme: ${style}. Output JSON for one campaign object.
   `;
 
-  // Fix: Explicitly typed response to resolve 'unknown' property errors
   const strategyResponse: GenerateContentResponse = await withRetry(() => ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
+    model: 'gemini-3-pro-preview',
     contents: {
       parts: [
         { inlineData: { mimeType: 'image/jpeg', data: base64Data } },
@@ -192,6 +181,7 @@ export const generateSingleAdCampaign = async (
       ],
     },
     config: {
+      thinkingConfig: { thinkingBudget: 8192 },
       responseMimeType: "application/json",
       responseSchema: {
         type: Type.OBJECT,
@@ -211,22 +201,22 @@ export const generateSingleAdCampaign = async (
   }));
 
   const text = strategyResponse.text;
-  if (!text) throw new Error("No strategy response from AI");
+  if (!text) throw new Error("No response from Strategy model.");
   const campaign = JSON.parse(text) as AdCampaign;
   campaign.id = newId;
 
-  // Fix: Explicitly typed response to resolve 'unknown' property errors
   const imageResponse: GenerateContentResponse = await withRetry(() => ai.models.generateContent({
-    model: 'gemini-2.5-flash-image',
+    model: 'gemini-3-pro-image-preview',
     contents: {
       parts: [
         { inlineData: { mimeType: 'image/jpeg', data: base64Data } },
-        { text: `Create a professional 9:16 advertisement image. Concept: ${campaign.imagePrompt}. Subject must be the exact character from the reference image. High-end professional photography.` }
+        { text: `PROFESSIONAL AD: ${campaign.imagePrompt}. Reference character must be preserved.` }
       ]
     },
     config: {
       imageConfig: {
-        aspectRatio: "9:16"
+        aspectRatio: "9:16",
+        imageSize: "1K"
       }
     }
   }));
