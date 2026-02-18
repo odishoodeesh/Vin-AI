@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10,8 +9,8 @@
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
-      // Shim process for Vite/Vercel compatibility as per Gemini API requirements
-      // We ensure this is defined globally before any other scripts run.
+      // Shim process for Vite/Vercel compatibility as per Gemini API requirements.
+      // This MUST be defined before any other modules load.
       window.process = window.process || { env: {} };
       
       tailwind.config = {
@@ -82,5 +81,7 @@
 </head>
 <body>
     <div id="root"></div>
+    <!-- The entry point is critical for Vite to build the application -->
+    <script type="module" src="./index.tsx"></script>
 </body>
 </html>
