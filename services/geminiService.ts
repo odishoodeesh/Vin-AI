@@ -1,23 +1,12 @@
-
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 import { AdCampaign, AdGenerationResponse } from "../types";
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-/**
- * Creates a fresh AI client instance. 
- * Invoked per-call to ensure it picks up the latest key injected by the selection dialog
- * in production environments like Vercel.
- */
 const getAIClient = () => {
-  // Use process.env.API_KEY directly as required by the guidelines
   return new GoogleGenAI({ apiKey: process.env.API_KEY });
 };
 
-/**
- * Wraps an API call with retry logic specifically for Vercel production workloads.
- * Handles rate limits (429) and transient fetch errors gracefully.
- */
 const withRetry = async <T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> => {
   let lastError: any;
   for (let i = 0; i < maxRetries; i++) {
@@ -27,7 +16,6 @@ const withRetry = async <T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> =>
       lastError = err;
       const errorMsg = err?.message || JSON.stringify(err);
       
-      // Retryable errors for cloud deployments
       const isRetryable = 
         errorMsg.includes('429') || 
         errorMsg.includes('RESOURCE_EXHAUSTED') || 
@@ -36,8 +24,7 @@ const withRetry = async <T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> =>
         errorMsg.includes('NetworkError');
       
       if (isRetryable && i < maxRetries - 1) {
-        // Exponential backoff
-        const delay = (i + 1) * 2000 + Math.random() * 1000;
+        const delay = (i + 1) * 3000 + Math.random() * 1000;
         await sleep(delay);
         continue;
       }
@@ -47,28 +34,30 @@ const withRetry = async <T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> =>
   throw lastError;
 };
 
+const cleanJson = (text: string) => {
+  return text.replace(/```json/g, '').replace(/```/g, '').trim();
+};
+
 export const generateAdCampaigns = async (
   characterImageB64: string,
   styleImageB64: string | null,
   styleName: string,
   onProgress: (index: number) => void
 ): Promise<AdGenerationResponse> => {
-  // 1. Create client per-session for key reactivity
   const ai = getAIClient();
-  const charBase64 = characterImageB64.split(',')[1] || characterImageB64;
-  const styleBase64 = styleImageB64 ? (styleImageB64.split(',')[1] || styleImageB64) : null;
+  const charBase64 = characterImageB64.includes(',') ? characterImageB64.split(',')[1] : characterImageB64;
+  const styleBase64 = styleImageB64 ? (styleImageB64.includes(',') ? styleImageB64.split(',')[1] : styleImageB64) : null;
   
   const strategyPrompt = `
-    Act as a world-class High-Fashion Creative Director and Lead Marketing Strategist. 
-    1. Analyze the FIRST image for unique character identity, facial features, and brand aesthetic.
-    2. Develop a premium influencer campaign strategy for this creator.
+    Act as a professional Creative Director. 
+    1. Analyze the character image.
+    2. Develop a premium influencer campaign strategy.
     3. The collection theme is: "${styleName}". 
-    ${styleBase64 ? "MANDATORY: Replicate the EXACT visual vibe, lighting, and textures from the SECOND image." : ""}
+    ${styleBase64 ? "Incorporate the visual vibe and lighting from the second image." : ""}
 
-    Generate 5 concept objects in JSON. Each must have:
-    - 'title', 'platform', 'audience', 'hook', 'caption', 'visualConcept', 'tone'
-    - 'imagePrompt': Detailed technical prompt. Must include: "9:16 vertical, high-end commercial fashion photography, cinematic lighting, ultra-detailed skin textures".
-    - IDENTITY RULE: State subject must be identical to reference photo 1.
+    Generate 5 concepts in JSON.
+    - 'imagePrompt': Detailed prompt for image generation. Include: "9:16 vertical, high-end commercial fashion, cinematic lighting, ultra-detailed skin".
+    - Rule: Subject must exactly match the first reference photo identity.
   `;
 
   const parts: any[] = [
@@ -79,7 +68,6 @@ export const generateAdCampaigns = async (
   }
   parts.push({ text: strategyPrompt });
 
-  // STEP 1: Deep Reasoning with Gemini 3 Pro
   const strategyResponse: GenerateContentResponse = await withRetry(() => ai.models.generateContent({
     model: 'gemini-3-pro-preview',
     contents: { parts },
@@ -115,19 +103,16 @@ export const generateAdCampaigns = async (
   }));
 
   const strategyText = strategyResponse.text;
-  if (!strategyText) throw new Error("Agency strategy engine failed to respond.");
-  const result = JSON.parse(strategyText) as AdGenerationResponse;
+  if (!strategyText) throw new Error("Strategy Engine: No content returned. The image might have been flagged or the prompt was too complex.");
+  
+  const result = JSON.parse(cleanJson(strategyText)) as AdGenerationResponse;
 
-  // STEP 2: Sequential High-Fidelity Rendering
-  // This approach ensures stability on Vercel and keeps browser requests healthy.
   const campaignsWithImages: AdCampaign[] = [];
   for (let i = 0; i < result.campaigns.length; i++) {
-    // Notify UI of start of specific campaign generation
     onProgress(i);
     const campaign = result.campaigns[i];
     
-    // Stabilize interval
-    if (i > 0) await sleep(500);
+    if (i > 0) await sleep(800);
 
     try {
       const imgParts: any[] = [
@@ -136,9 +121,8 @@ export const generateAdCampaigns = async (
       if (styleBase64) {
         imgParts.push({ inlineData: { mimeType: 'image/jpeg', data: styleBase64 } });
       }
-      imgParts.push({ text: `RENDER HIGH-FIDELITY AD: ${campaign.imagePrompt}. Subject MUST match reference 1 identity.` });
+      imgParts.push({ text: `PHOTO-REALISTIC RENDER: ${campaign.imagePrompt}. Ensure subject identity matches the first image perfectly.` });
 
-      // Gemini 2.5 Flash Image for maximum speed and compatibility
       const imageResponse: GenerateContentResponse = await withRetry(() => ai.models.generateContent({
         model: 'gemini-2.5-flash-image',
         contents: { parts: imgParts },
@@ -155,7 +139,7 @@ export const generateAdCampaigns = async (
         campaignsWithImages.push(campaign);
       }
     } catch (err) {
-      console.error(`Asset rendering #${i} skipped due to system load.`, err);
+      console.warn(`Asset #${i} rendering failed:`, err);
       campaignsWithImages.push(campaign);
     }
   }
@@ -170,13 +154,10 @@ export const generateSingleAdCampaign = async (
   newId: number
 ): Promise<AdCampaign> => {
   const ai = getAIClient();
-  const charBase64 = characterImageB64.split(',')[1] || characterImageB64;
-  const styleBase64 = styleImageB64 ? (styleImageB64.split(',')[1] || styleImageB64) : null;
+  const charBase64 = characterImageB64.includes(',') ? characterImageB64.split(',')[1] : characterImageB64;
+  const styleBase64 = styleImageB64 ? (styleImageB64.includes(',') ? styleImageB64.split(',')[1] : styleImageB64) : null;
 
-  const strategyPrompt = `
-    Create ONE premium ad variation. Theme: "${styleName}". 
-    Respond in JSON matching the standard campaign schema.
-  `;
+  const strategyPrompt = `Generate ONE high-converting ad concept in JSON for: "${styleName}". Use reference 1 for identity.`;
 
   const parts: any[] = [{ inlineData: { mimeType: 'image/jpeg', data: charBase64 } }];
   if (styleBase64) parts.push({ inlineData: { mimeType: 'image/jpeg', data: styleBase64 } });
@@ -186,7 +167,7 @@ export const generateSingleAdCampaign = async (
     model: 'gemini-3-pro-preview',
     contents: { parts },
     config: {
-      thinkingConfig: { thinkingBudget: 8192 },
+      thinkingBudget: 8192,
       responseMimeType: "application/json",
       responseSchema: {
         type: Type.OBJECT,
@@ -206,13 +187,13 @@ export const generateSingleAdCampaign = async (
   }));
 
   const text = strategyResponse.text;
-  if (!text) throw new Error("Variation strategy engine timed out.");
-  const campaign = JSON.parse(text) as AdCampaign;
+  if (!text) throw new Error("Variation strategy failed.");
+  const campaign = JSON.parse(cleanJson(text)) as AdCampaign;
   campaign.id = newId;
 
   const imgParts: any[] = [{ inlineData: { mimeType: 'image/jpeg', data: charBase64 } }];
   if (styleBase64) imgParts.push({ inlineData: { mimeType: 'image/jpeg', data: styleBase64 } });
-  imgParts.push({ text: `RENDER BOUTIQUE AD: ${campaign.imagePrompt}` });
+  imgParts.push({ text: `BOUTIQUE AD RENDER: ${campaign.imagePrompt}` });
 
   const imageResponse: GenerateContentResponse = await withRetry(() => ai.models.generateContent({
     model: 'gemini-2.5-flash-image',

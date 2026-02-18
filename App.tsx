@@ -68,7 +68,7 @@ function App() {
       }
     } catch (err: any) {
       console.error(err);
-      setError("Creative Engine Timeout. Please ensure character lighting is clear and retry.");
+      setError(err?.message || "Creative Engine encountered an issue. Please try a different image or refresh.");
     } finally {
       setIsProcessing(false);
     }
