@@ -5,12 +5,25 @@ import { AdCard } from './components/AdCard';
 import { generateAdCampaigns, generateSingleAdCampaign } from './services/geminiService';
 import { AdGenerationResponse, AdCampaign } from './types';
 
+const LogoStripe = ({ className = "w-10 h-10" }) => (
+  <div className={`${className} flex overflow-hidden rounded-lg shadow-lg`}>
+    <div className="h-full flex-1 bg-[#94bd44]"></div>
+    <div className="h-full flex-1 bg-[#4d4d4d]"></div>
+    <div className="h-full flex-1 bg-[#4b5e35]"></div>
+    <div className="h-full flex-1 bg-[#ecf0e5]"></div>
+    <div className="h-full flex-1 bg-[#8a8a8a]"></div>
+    <div className="h-full flex-1 bg-[#8ba360]"></div>
+    <div className="h-full flex-1 bg-[#6b7d4a]"></div>
+  </div>
+);
+
 function App() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isGeneratingMore, setIsGeneratingMore] = useState(false);
   const [progressIndex, setProgressIndex] = useState(0);
   const [result, setResult] = useState<AdGenerationResponse | null>(null);
-  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [uploadedChar, setUploadedChar] = useState<string | null>(null);
+  const [uploadedStyleRef, setUploadedStyleRef] = useState<string | null>(null);
   const [selectedStyle, setSelectedStyle] = useState<string>('Random');
   const [error, setError] = useState<string | null>(null);
   const [isReelConnected, setIsReelConnected] = useState(false);
@@ -24,7 +37,6 @@ function App() {
         const selected = await window.aistudio.hasSelectedApiKey();
         setHasKey(selected);
       } else {
-        // Fallback for non-aistudio environments if key is in process.env
         setHasKey(!!process.env.API_KEY);
       }
     };
@@ -34,36 +46,37 @@ function App() {
   const handleSelectKey = async () => {
     if (window.aistudio?.openSelectKey) {
       await window.aistudio.openSelectKey();
-      // Assume success after trigger as per instructions
       setHasKey(true);
+      setError(null);
       showNotification("Agency key activated!", 'success');
     }
   };
 
-  const handleUpload = useCallback(async (base64: string, style: string) => {
+  const handleUpload = useCallback(async (charBase64: string, styleBase64: string | null, style: string) => {
     if (!hasKey) {
       setError("Please select a billing-enabled API key to generate high-quality campaigns.");
       return;
     }
 
     setIsProcessing(true);
-    setUploadedImage(base64);
+    setUploadedChar(charBase64);
+    setUploadedStyleRef(styleBase64);
     setSelectedStyle(style);
     setProgressIndex(0);
     setError(null);
     try {
-      const response = await generateAdCampaigns(base64, style, (idx) => setProgressIndex(idx + 1));
+      const response = await generateAdCampaigns(charBase64, styleBase64, style, (idx) => setProgressIndex(idx + 1));
       setResult(response);
     } catch (err: any) {
       console.error(err);
       const msg = err?.message || JSON.stringify(err);
       if (msg.includes("Requested entity was not found")) {
         setHasKey(false);
-        setError("API Key verification failed. Please re-select your key.");
+        setError("API Key verification failed (404). Please re-select your key.");
       } else if (msg.includes("429") || msg.includes("RESOURCE_EXHAUSTED")) {
-        setError("Quota exceeded. Switch to a paid billing project for uninterrupted generation.");
+        setError("Quota exceeded (429). Switch to a paid billing project for uninterrupted generation.");
       } else {
-        setError("Failed to process creative strategy. Please check your connection and try again.");
+        setError("System processing error. Please check your connection or try a different key.");
       }
     } finally {
       setIsProcessing(false);
@@ -71,11 +84,11 @@ function App() {
   }, [hasKey]);
 
   const handleGenerateMore = async () => {
-    if (!uploadedImage || !result) return;
+    if (!uploadedChar || !result) return;
     setIsGeneratingMore(true);
     try {
       const nextId = result.campaigns.length + 1;
-      const newCampaign = await generateSingleAdCampaign(uploadedImage, selectedStyle, nextId);
+      const newCampaign = await generateSingleAdCampaign(uploadedChar, uploadedStyleRef, selectedStyle, nextId);
       setResult(prev => {
         if (!prev) return prev;
         return {
@@ -107,27 +120,27 @@ function App() {
 
   const reset = () => {
     setResult(null);
-    setUploadedImage(null);
+    setUploadedChar(null);
+    setUploadedStyleRef(null);
     setError(null);
     setProgressIndex(0);
   };
 
-  // Mandatory Key Selection Gateway for high-quality Pro models
   if (hasKey === false) {
     return (
       <div className="min-h-screen bg-[#050505] flex items-center justify-center p-6 text-center">
-        <div className="max-w-md w-full space-y-8 p-10 bg-[#0a0a0a] border border-gray-800 rounded-[3rem] shadow-2xl">
-          <div className="w-20 h-20 bg-indigo-600 rounded-3xl mx-auto flex items-center justify-center text-4xl font-black shadow-2xl shadow-indigo-600/20">V</div>
+        <div className="max-w-md w-full space-y-8 p-10 bg-[#0a0a0a] border border-brand-olive/20 rounded-[3rem] shadow-2xl">
+          <LogoStripe className="w-24 h-24 mx-auto rounded-3xl" />
           <div className="space-y-4">
             <h2 className="text-3xl font-black text-white tracking-tight">Agency Access Required</h2>
             <p className="text-gray-400 text-sm leading-relaxed">
-              To generate 5 professional 1K resolution ad campaigns, Vin AI requires a billing-enabled Gemini API key.
+              To generate professional ad campaigns, Vin AI requires a billing-enabled Gemini API key.
             </p>
           </div>
           <div className="space-y-4">
             <button 
               onClick={handleSelectKey}
-              className="w-full bg-white text-black py-4 rounded-full font-black text-xs uppercase tracking-[0.2em] hover:bg-indigo-500 hover:text-white transition-all shadow-xl shadow-white/5 active:scale-95"
+              className="w-full bg-brand-lime text-black py-4 rounded-full font-black text-xs uppercase tracking-[0.2em] hover:brightness-110 transition-all shadow-xl shadow-brand-lime/10 active:scale-95"
             >
               Select Paid API Key
             </button>
@@ -135,7 +148,7 @@ function App() {
               href="https://ai.google.dev/gemini-api/docs/billing" 
               target="_blank" 
               rel="noopener noreferrer"
-              className="block text-[10px] text-gray-500 hover:text-indigo-400 underline uppercase tracking-widest transition-colors"
+              className="block text-[10px] text-gray-500 hover:text-brand-lime underline uppercase tracking-widest transition-colors"
             >
               About Gemini Billing & API Keys
             </a>
@@ -146,21 +159,21 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#050505] selection:bg-indigo-500/30 relative text-white">
+    <div className="min-h-screen gradient-bg selection:bg-brand-lime/30 relative text-white">
       {notification && (
         <div className={`fixed top-6 right-6 z-[100] px-6 py-4 rounded-2xl shadow-2xl border backdrop-blur-xl flex items-center gap-3 animate-scale-in ${
-          notification.type === 'success' ? 'bg-green-500/10 border-green-500/50 text-green-400' : 'bg-red-500/10 border-red-500/50 text-red-400'
+          notification.type === 'success' ? 'bg-brand-lime/10 border-brand-lime/50 text-brand-lime' : 'bg-red-500/10 border-red-500/50 text-red-400'
         }`}>
-          <div className={`w-2 h-2 rounded-full ${notification.type === 'success' ? 'bg-green-500' : 'bg-red-500'}`}></div>
+          <div className={`w-2 h-2 rounded-full ${notification.type === 'success' ? 'bg-brand-lime' : 'bg-red-500'}`}></div>
           <span className="text-sm font-bold tracking-tight">{notification.message}</span>
         </div>
       )}
 
-      <nav className="border-b border-gray-900 bg-black/80 backdrop-blur-xl sticky top-0 z-50">
+      <nav className="border-b border-brand-olive/20 bg-black/80 backdrop-blur-xl sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-4 group cursor-pointer" onClick={reset}>
-            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center font-black text-xl shadow-lg shadow-indigo-600/10 group-hover:scale-110 transition-transform">V</div>
-            <h1 className="text-xl font-black tracking-tighter">Vin <span className="text-indigo-500">AI</span></h1>
+            <LogoStripe className="w-10 h-10 group-hover:scale-110 transition-transform" />
+            <h1 className="text-xl font-black tracking-tighter">Vin <span className="text-brand-lime">AI</span></h1>
           </div>
           
           <div className="flex items-center gap-6">
@@ -168,21 +181,21 @@ function App() {
               <button 
                 onClick={handleConnectReel}
                 disabled={isConnecting}
-                className="bg-[#111] border border-gray-800 hover:border-gray-500 px-6 py-2.5 rounded-full transition-all text-[10px] font-black uppercase tracking-widest text-white flex items-center gap-2"
+                className="bg-[#111] border border-brand-olive/30 hover:border-brand-lime/50 px-6 py-2.5 rounded-full transition-all text-[10px] font-black uppercase tracking-widest text-white flex items-center gap-2"
               >
                 {isConnecting ? 'Authenticating...' : 'Connect Socials'}
               </button>
             ) : (
-              <div className="flex items-center gap-2 bg-indigo-500/5 border border-indigo-500/20 px-5 py-2.5 rounded-full">
-                <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
-                <span className="text-[10px] font-black uppercase tracking-widest text-indigo-400">@Creator_Live</span>
+              <div className="flex items-center gap-2 bg-brand-lime/5 border border-brand-lime/20 px-5 py-2.5 rounded-full">
+                <div className="w-1.5 h-1.5 rounded-full bg-brand-lime animate-pulse"></div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-brand-lime">@Creator_Live</span>
               </div>
             )}
             
-            {uploadedImage && !isProcessing && (
+            {uploadedChar && !isProcessing && (
               <button 
                 onClick={reset}
-                className="text-[10px] font-black uppercase tracking-widest bg-white text-black px-6 py-2.5 rounded-full hover:bg-indigo-500 hover:text-white transition-all"
+                className="text-[10px] font-black uppercase tracking-widest bg-brand-lime text-black px-6 py-2.5 rounded-full hover:brightness-110 transition-all"
               >
                 New Studio
               </button>
@@ -192,56 +205,54 @@ function App() {
       </nav>
 
       <main className="max-w-7xl mx-auto px-6 py-12">
-        {!uploadedImage ? (
+        {!uploadedChar ? (
           <div className="text-center py-20 space-y-10">
             <div className="space-y-4">
-              <div className="inline-block px-4 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[10px] font-black uppercase tracking-widest">
-                Professional Creative Suite
+              <div className="inline-block px-4 py-1 rounded-full bg-brand-lime/10 border border-brand-lime/20 text-brand-lime text-[10px] font-black uppercase tracking-widest">
+                AI Creative Studio
               </div>
               <h2 className="text-7xl font-black tracking-tighter leading-[0.9] max-w-4xl mx-auto">
-                Turn your <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-cyan-400">Character</span> <br/>
+                Turn your <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-lime via-brand-sage to-brand-cream">Character</span> <br/>
                 into a global campaign.
               </h2>
               <p className="text-gray-500 text-lg max-w-2xl mx-auto leading-relaxed">
-                Generate 5 high-converting 1K ad creatives using Gemini 3 Pro. Optimized for Reels, TikTok, and direct social publishing.
+                Copy style, place, and fashion from reference photos. Preserve identity across all frames.
               </p>
             </div>
             <UploadArea onUpload={handleUpload} isProcessing={isProcessing} />
           </div>
         ) : (
           <div className="space-y-16 animate-scale-in">
-            <div className="bg-[#0a0a0a] border border-gray-900 p-10 rounded-[3rem] shadow-2xl relative overflow-hidden">
+            <div className="bg-[#11120f] border border-brand-olive/20 p-10 rounded-[3rem] shadow-2xl relative overflow-hidden">
               <div className="flex flex-col md:flex-row gap-12 items-center relative z-10">
-                <div className="w-full md:w-64 shrink-0">
-                  <div className="relative aspect-[9/16] rounded-3xl overflow-hidden ring-1 ring-white/10 shadow-3xl shadow-indigo-500/10">
-                    <img src={uploadedImage} alt="Reference" className="w-full h-full object-cover" />
-                    {isProcessing && (
-                      <div className="absolute inset-0 bg-black/80 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center">
-                         <div className="w-12 h-12 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-                         <p className="text-[10px] font-black uppercase tracking-widest animate-pulse">Deep Analysis...</p>
-                      </div>
-                    )}
+                <div className="w-full md:w-64 shrink-0 flex flex-col gap-4">
+                  <div className="relative aspect-[9/16] rounded-3xl overflow-hidden ring-1 ring-white/10 shadow-3xl shadow-brand-lime/5">
+                    <img src={uploadedChar} alt="Character" className="w-full h-full object-cover" />
+                    <div className="absolute bottom-2 left-2 px-2 py-1 bg-brand-lime text-black text-[8px] font-black rounded uppercase">IDENTITY</div>
                   </div>
+                  {uploadedStyleRef && (
+                    <div className="relative aspect-[9/16] rounded-3xl overflow-hidden ring-1 ring-white/10 shadow-3xl shadow-brand-sage/5 h-32 md:h-auto">
+                      <img src={uploadedStyleRef} alt="Style" className="w-full h-full object-cover" />
+                      <div className="absolute bottom-2 left-2 px-2 py-1 bg-brand-sage text-white text-[8px] font-black rounded uppercase">STYLE REF</div>
+                    </div>
+                  )}
                 </div>
                 
                 <div className="flex-1 space-y-8">
                   <div className="space-y-2">
                     <div className="flex items-center gap-3">
-                      <h3 className="text-5xl font-black tracking-tighter">Strategic Insight</h3>
-                      <div className="px-3 py-1 bg-indigo-500/10 border border-indigo-500/20 rounded-full text-indigo-400 text-[10px] font-black uppercase tracking-widest">
-                        PRO {selectedStyle}
+                      <h3 className="text-5xl font-black tracking-tighter">Neural Analysis</h3>
+                      <div className="px-3 py-1 bg-brand-lime/10 border border-brand-lime/20 rounded-full text-brand-lime text-[10px] font-black uppercase tracking-widest">
+                        {selectedStyle}
                       </div>
                     </div>
-                    {isProcessing && (
-                      <p className="text-indigo-400/50 text-xs font-medium uppercase tracking-[0.2em]">Utilizing 16k Token Thinking Budget</p>
-                    )}
                   </div>
                   
                   {isProcessing ? (
                     <div className="space-y-6 max-w-md">
-                      <div className="h-1.5 bg-gray-900 rounded-full w-full overflow-hidden">
+                      <div className="h-1.5 bg-brand-olive/20 rounded-full w-full overflow-hidden">
                         <div 
-                          className="h-full bg-indigo-500 transition-all duration-700 ease-in-out" 
+                          className="h-full bg-brand-lime transition-all duration-700 ease-in-out" 
                           style={{ width: `${(progressIndex / 5) * 100}%` }}
                         ></div>
                       </div>
@@ -249,7 +260,6 @@ function App() {
                         <p className="text-white text-xs font-black uppercase tracking-widest">
                           {progressIndex === 0 ? "Analyzing Brand DNA..." : `Crafting Campaign ${progressIndex} of 5...`}
                         </p>
-                        <p className="text-gray-500 text-[10px] uppercase tracking-wider">Sequential Pro Generation (Vercel Optimized)</p>
                       </div>
                     </div>
                   ) : (
@@ -268,25 +278,25 @@ function App() {
                         onClick={handleSelectKey}
                         className="text-[9px] font-black uppercase tracking-widest bg-red-500/20 text-red-400 px-5 py-2.5 rounded-full border border-red-500/30 hover:bg-red-500/30 transition-all"
                       >
-                        Renew API Key
+                        Change API Key
                       </button>
                     </div>
                   )}
                 </div>
               </div>
-              <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-indigo-600/5 blur-[120px] rounded-full"></div>
+              <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-brand-lime/5 blur-[120px] rounded-full"></div>
             </div>
 
             <div className="space-y-12">
-              <div className="flex items-center justify-between border-b border-gray-900 pb-8">
-                <h3 className="text-4xl font-black tracking-tighter">THE <span className="text-indigo-500">VIN</span> GALLERY</h3>
+              <div className="flex items-center justify-between border-b border-brand-olive/20 pb-8">
+                <h3 className="text-4xl font-black tracking-tighter uppercase">Campaign <span className="text-brand-lime">Vault</span></h3>
                 {!isProcessing && result && (
                   <button 
                     onClick={handleGenerateMore}
                     disabled={isGeneratingMore}
-                    className="flex items-center gap-3 bg-white text-black px-8 py-3 rounded-full hover:bg-indigo-600 hover:text-white transition-all text-[10px] font-black uppercase tracking-[0.2em] disabled:opacity-50"
+                    className="flex items-center gap-3 bg-white text-black px-8 py-3 rounded-full hover:bg-brand-lime hover:text-black transition-all text-[10px] font-black uppercase tracking-[0.2em] disabled:opacity-50"
                   >
-                    {isGeneratingMore ? 'Processing...' : 'Add Variation'}
+                    {isGeneratingMore ? 'Rendering...' : 'Add Creative'}
                   </button>
                 )}
               </div>
@@ -294,10 +304,10 @@ function App() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-8">
                 {isProcessing && !result ? (
                   Array.from({ length: 5 }).map((_, i) => (
-                    <div key={i} className="aspect-[9/20] bg-gray-900/20 rounded-3xl animate-pulse border border-gray-900 flex flex-col p-6 space-y-4">
-                       <div className="flex-1 bg-gray-900/50 rounded-2xl"></div>
-                       <div className="h-4 bg-gray-900/50 rounded-full w-3/4"></div>
-                       <div className="h-4 bg-gray-900/50 rounded-full w-1/2"></div>
+                    <div key={i} className="aspect-[9/20] bg-brand-olive/5 rounded-3xl animate-pulse border border-brand-olive/10 flex flex-col p-6 space-y-4">
+                       <div className="flex-1 bg-brand-olive/10 rounded-2xl"></div>
+                       <div className="h-4 bg-brand-olive/10 rounded-full w-3/4"></div>
+                       <div className="h-4 bg-brand-olive/10 rounded-full w-1/2"></div>
                     </div>
                   ))
                 ) : (
@@ -316,16 +326,16 @@ function App() {
         )}
       </main>
 
-      <footer className="border-t border-gray-900 py-20 mt-20">
+      <footer className="border-t border-brand-olive/20 py-20 mt-20 bg-black/40">
         <div className="max-w-7xl mx-auto px-6 text-center space-y-8">
-          <div className="flex justify-center gap-12 text-[10px] font-black uppercase tracking-[0.4em] text-gray-700">
-             <span className="hover:text-white transition-colors cursor-default">PREMIUM</span>
-             <span className="hover:text-white transition-colors cursor-default">AUTONOMOUS</span>
-             <span className="hover:text-white transition-colors cursor-default">CREATIVE</span>
+          <div className="flex justify-center gap-12 text-[10px] font-black uppercase tracking-[0.4em] text-brand-olive">
+             <span className="hover:text-brand-lime transition-colors cursor-default">PREMIUM</span>
+             <span className="hover:text-brand-lime transition-colors cursor-default">AUTONOMOUS</span>
+             <span className="hover:text-brand-lime transition-colors cursor-default">CREATIVE</span>
           </div>
           <div className="space-y-2">
-            <p className="text-gray-600 text-[10px] uppercase tracking-widest font-black">&copy; 2024 VIN AI • LONDON • NYC • TOKYO</p>
-            <p className="text-gray-800 text-[8px] uppercase tracking-widest">Built with Gemini 3 Pro Technology</p>
+            <p className="text-gray-600 text-[10px] uppercase tracking-widest font-black">&copy; 2024 VIN AI • GLOBAL MARKETING ENGINE</p>
+            <p className="text-brand-olive text-[8px] uppercase tracking-widest">Powered by Gemini AI Technology</p>
           </div>
         </div>
       </footer>

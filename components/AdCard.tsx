@@ -17,7 +17,7 @@ export const AdCard: React.FC<AdCardProps> = ({ campaign, isReelConnected, onPos
     const link = document.createElement('a');
     link.href = campaign.imageUrl;
     const safeTitle = campaign.title.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-    link.download = `Ad_${campaign.id}_${safeTitle}.png`;
+    link.download = `VinAd_${campaign.id}_${safeTitle}.png`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -25,9 +25,7 @@ export const AdCard: React.FC<AdCardProps> = ({ campaign, isReelConnected, onPos
 
   const handlePostToReels = () => {
     if (!campaign.imageUrl || isPublishing || isPublished) return;
-    
     setIsPublishing(true);
-    // Simulate API upload to Reels
     setTimeout(() => {
       setIsPublishing(false);
       setIsPublished(true);
@@ -36,122 +34,109 @@ export const AdCard: React.FC<AdCardProps> = ({ campaign, isReelConnected, onPos
   };
 
   return (
-    <div className="bg-[#111] border border-gray-800 rounded-2xl overflow-hidden hover:border-indigo-500/50 transition-all duration-500 group flex flex-col h-full shadow-2xl relative">
-      {/* 9:16 Image Container */}
-      <div className="relative aspect-[9/16] bg-gray-900 overflow-hidden">
+    <div className="bg-[#121411] border border-brand-olive/10 rounded-[2rem] overflow-hidden hover:border-brand-lime/30 transition-all duration-500 group flex flex-col h-full shadow-2xl relative">
+      <div className="relative aspect-[9/16] bg-black overflow-hidden">
         {campaign.imageUrl ? (
           <img 
             src={campaign.imageUrl} 
             alt={campaign.title}
-            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+            className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-gray-700">
-            No Image Generated
+          <div className="w-full h-full flex items-center justify-center text-brand-olive/20 font-black uppercase text-xs tracking-widest">
+            Rendering Asset...
           </div>
         )}
         
-        {/* Ad Platform Overlay */}
         <div className="absolute top-4 left-4 right-4 flex justify-between items-center z-10">
-          <span className="px-3 py-1 bg-black/60 backdrop-blur-md text-white text-[10px] font-bold rounded-full border border-white/20 uppercase tracking-widest">
+          <span className="px-3 py-1 bg-black/40 backdrop-blur-xl text-brand-lime text-[9px] font-black rounded-full border border-brand-lime/20 uppercase tracking-[0.2em]">
             {campaign.platform}
           </span>
-          <div className="w-8 h-8 rounded-full bg-indigo-500/20 backdrop-blur-sm border border-white/10 flex items-center justify-center">
-            <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></div>
+          <div className="w-8 h-8 rounded-full bg-brand-lime/10 backdrop-blur-xl border border-brand-lime/20 flex items-center justify-center">
+            <div className="w-1.5 h-1.5 rounded-full bg-brand-lime animate-pulse"></div>
           </div>
         </div>
 
-        {/* Publishing Overlay */}
         {isPublishing && (
-          <div className="absolute inset-0 z-20 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center text-center p-6">
-            <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-            <p className="text-white font-black uppercase tracking-widest text-xs">Publishing to Reels</p>
-            <p className="text-gray-500 text-[10px] mt-2 italic leading-relaxed">Uploading creative & syncing caption...</p>
+          <div className="absolute inset-0 z-20 bg-black/90 backdrop-blur-md flex flex-col items-center justify-center text-center p-6">
+            <div className="w-12 h-12 border-2 border-brand-lime border-t-transparent rounded-full animate-spin mb-4"></div>
+            <p className="text-brand-lime font-black uppercase tracking-[0.2em] text-[10px]">Uploading Stream</p>
           </div>
         )}
 
-        {/* Success Overlay */}
         {isPublished && (
-          <div className="absolute inset-0 z-20 bg-green-500/20 backdrop-blur-[2px] flex flex-col items-center justify-center">
-            <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center shadow-lg shadow-green-500/20 mb-3 animate-scale-in">
-              <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="absolute inset-0 z-20 bg-brand-lime/10 backdrop-blur-sm flex flex-col items-center justify-center">
+            <div className="w-16 h-16 bg-brand-lime rounded-full flex items-center justify-center shadow-2xl shadow-brand-lime/20 mb-3 animate-scale-in">
+              <svg className="w-8 h-8 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7"></path>
               </svg>
             </div>
-            <p className="text-white font-black uppercase tracking-widest text-xs drop-shadow-md">Posted to Reels</p>
+            <p className="text-white font-black uppercase tracking-widest text-[10px]">Live on Feed</p>
           </div>
         )}
 
-        {/* Caption Overlay - Bottom */}
-        <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black via-black/80 to-transparent pt-20">
-          <h3 className="text-xl font-black text-white mb-2 leading-tight uppercase tracking-tight">
+        <div className="absolute bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-black via-black/80 to-transparent pt-24">
+          <h3 className="text-xl font-black text-white mb-2 leading-tight uppercase tracking-tighter">
             {campaign.title}
           </h3>
-          <p className="text-indigo-300 font-bold text-sm mb-3 italic">
+          <p className="text-brand-lime font-bold text-xs mb-3 italic tracking-wide opacity-90">
             "{campaign.hook}"
           </p>
         </div>
       </div>
       
-      {/* Strategy Content */}
-      <div className="p-6 space-y-4 flex-1 flex flex-col">
+      <div className="p-6 space-y-5 flex-1 flex flex-col">
         {isReelConnected && (
           <button 
             onClick={handlePostToReels}
             disabled={!campaign.imageUrl || isPublishing || isPublished}
-            className={`w-full py-3 rounded-xl font-black text-[10px] uppercase tracking-[0.2em] flex items-center justify-center gap-2 transition-all duration-300 ${
+            className={`w-full py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] flex items-center justify-center gap-2 transition-all duration-500 ${
               isPublished 
-                ? 'bg-green-500/20 text-green-400 border border-green-500/30 cursor-default'
-                : 'bg-white text-black hover:bg-indigo-500 hover:text-white border border-transparent shadow-lg shadow-white/5 active:scale-95'
+                ? 'bg-brand-olive/20 text-brand-olive border border-brand-olive/30 cursor-default'
+                : 'bg-brand-lime text-black hover:bg-white border border-transparent shadow-xl shadow-brand-lime/5 active:scale-95'
             }`}
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
-            </svg>
-            {isPublished ? 'Live on Reels' : isPublishing ? 'Uploading...' : 'Post to Reels'}
+            {isPublished ? 'Published' : isPublishing ? 'Transmitting...' : 'Post Instantly'}
           </button>
         )}
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-4 border-b border-brand-olive/10 pb-4">
           <div>
-            <h4 className="text-gray-500 font-bold text-[9px] uppercase tracking-widest mb-1">Audience</h4>
-            <p className="text-gray-300 text-xs font-medium">{campaign.audience}</p>
+            <h4 className="text-brand-olive font-black text-[8px] uppercase tracking-[0.2em] mb-1 opacity-60">Targeting</h4>
+            <p className="text-gray-400 text-[11px] font-bold leading-tight">{campaign.audience}</p>
           </div>
           <div className="text-right">
-            <h4 className="text-gray-500 font-bold text-[9px] uppercase tracking-widest mb-1">Tone</h4>
-            <p className="text-gray-300 text-xs font-medium">{campaign.tone}</p>
+            <h4 className="text-brand-olive font-black text-[8px] uppercase tracking-[0.2em] mb-1 opacity-60">Vibe</h4>
+            <p className="text-gray-400 text-[11px] font-bold leading-tight">{campaign.tone}</p>
           </div>
         </div>
 
         <div className="flex-1">
-          <h4 className="text-gray-500 font-bold text-[9px] uppercase tracking-widest mb-1 flex justify-between items-center">
-            <span>Caption</span>
-            {isReelConnected && <span className="text-indigo-500/50 text-[7px]">Synced to post</span>}
-          </h4>
-          <div className="bg-black/50 border border-gray-800 p-3 rounded-lg text-xs text-gray-400 leading-relaxed italic">
+          <h4 className="text-brand-olive font-black text-[8px] uppercase tracking-[0.2em] mb-2 opacity-60">Caption Copy</h4>
+          <div className="bg-black/40 border border-brand-olive/10 p-4 rounded-2xl text-[11px] text-gray-400 leading-relaxed font-medium italic opacity-80">
             {campaign.caption}
           </div>
         </div>
 
-        <div className="pt-4 mt-auto flex items-center justify-between border-t border-gray-800">
+        <div className="pt-4 mt-auto flex items-center justify-between border-t border-brand-olive/10">
           <button 
             onClick={handleDownload}
             disabled={!campaign.imageUrl}
-            className={`text-[10px] font-bold uppercase tracking-widest transition-all duration-300 flex items-center gap-2 ${
+            className={`text-[9px] font-black uppercase tracking-[0.2em] transition-all duration-300 flex items-center gap-2 ${
               campaign.imageUrl 
-                ? 'text-indigo-400 hover:text-indigo-300 cursor-pointer' 
-                : 'text-gray-700 cursor-not-allowed'
+                ? 'text-brand-olive hover:text-brand-lime cursor-pointer' 
+                : 'text-gray-800 cursor-not-allowed'
             }`}
           >
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
             </svg>
-            Save File
+            Export Asset
           </button>
-          <div className="flex gap-1">
-            <div className="w-1 h-1 rounded-full bg-gray-700"></div>
-            <div className="w-1 h-1 rounded-full bg-gray-700"></div>
-            <div className="w-1 h-1 rounded-full bg-indigo-500"></div>
+          <div className="flex gap-1.5 opacity-30">
+            <div className="w-1 h-1 rounded-full bg-brand-olive"></div>
+            <div className="w-1 h-1 rounded-full bg-brand-olive"></div>
+            <div className="w-1 h-1 rounded-full bg-brand-lime"></div>
           </div>
         </div>
       </div>
