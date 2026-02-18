@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { UploadArea } from './components/UploadArea';
 import { AdCard } from './components/AdCard';
 import { generateAdCampaigns, generateSingleAdCampaign } from './services/geminiService';
@@ -29,42 +29,8 @@ function App() {
   const [isReelConnected, setIsReelConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [notification, setNotification] = useState<{message: string, type: 'success' | 'error'} | null>(null);
-  const [hasKey, setHasKey] = useState<boolean | null>(null);
-
-  // VERCEL PRODUCTION: Initialize key check
-  useEffect(() => {
-    const checkKey = async () => {
-      try {
-        if (window.aistudio?.hasSelectedApiKey) {
-          const selected = await window.aistudio.hasSelectedApiKey();
-          setHasKey(selected);
-        } else {
-          // Shim for local dev or standard env injection
-          setHasKey(!!process.env.API_KEY);
-        }
-      } catch (e) {
-        setHasKey(false);
-      }
-    };
-    checkKey();
-  }, []);
-
-  const handleSelectKey = async () => {
-    if (window.aistudio?.openSelectKey) {
-      await window.aistudio.openSelectKey();
-      // MANDATORY: Mitigate race condition by assuming success after dialog trigger
-      setHasKey(true);
-      setError(null);
-      showNotification("Agency key activated!", 'success');
-    }
-  };
 
   const handleUpload = useCallback(async (charBase64: string, styleBase64: string | null, style: string) => {
-    if (!hasKey) {
-      setError("Agency key required for 8K Pro rendering.");
-      return;
-    }
-
     setIsProcessing(true);
     setUploadedChar(charBase64);
     setUploadedStyleRef(styleBase64);
@@ -79,20 +45,17 @@ function App() {
       console.error(err);
       const msg = err?.message || JSON.stringify(err);
       
-      if (msg.includes("Requested entity was not found")) {
-        setHasKey(false);
-        setError("Key verification failed. Please re-initialize your agency key.");
-      } else if (msg.includes("403") || msg.includes("PERMISSION_DENIED")) {
-        setError("Access Denied (403). Ensure billing is active on your selected project.");
+      if (msg.includes("403") || msg.includes("PERMISSION_DENIED")) {
+        setError("Access Denied (403). Please ensure the API environment is correctly configured.");
       } else if (msg.includes("429") || msg.includes("RESOURCE_EXHAUSTED")) {
-        setError("Rate limit reached. Please wait 60s or use a paid agency key.");
+        setError("Rate limit reached. Please wait 60s before generating more campaigns.");
       } else {
-        setError("Rendering session timed out. Please refresh and try again.");
+        setError("Rendering session encountered an error. Please try again.");
       }
     } finally {
       setIsProcessing(false);
     }
-  }, [hasKey]);
+  }, []);
 
   const handleGenerateMore = async () => {
     if (!uploadedChar || !result) return;
@@ -106,7 +69,7 @@ function App() {
       });
       showNotification(`Variation #${nextId} Live!`, 'success');
     } catch (err: any) {
-      showNotification("Asset queue full.", 'error');
+      showNotification("Generation failed. Please try again.", 'error');
     } finally {
       setIsGeneratingMore(false);
     }
@@ -133,39 +96,6 @@ function App() {
     setError(null);
     setProgressIndex(0);
   };
-
-  // Vercel Key Selector Gateway
-  if (hasKey === false) {
-    return (
-      <div className="min-h-screen bg-[#050604] flex items-center justify-center p-6 text-center">
-        <div className="max-w-md w-full space-y-12 p-12 bg-[#0d0e0c] border border-white/5 rounded-[4rem] shadow-4xl animate-scale-in">
-          <LogoStripe className="w-24 h-24 mx-auto rounded-3xl" />
-          <div className="space-y-6">
-            <h2 className="text-4xl font-black text-white tracking-tighter uppercase leading-none">Initialize Studio</h2>
-            <p className="text-gray-500 text-sm leading-relaxed font-medium">
-              Vin AI runs on high-fidelity Gemini 3 Pro reasoning. To maintain professional 8K output and zero latency, please link a paid Agency key.
-            </p>
-          </div>
-          <div className="space-y-4 pt-4">
-            <button 
-              onClick={handleSelectKey}
-              className="w-full bg-brand-lime text-black py-5 rounded-full font-black text-xs uppercase tracking-[0.3em] hover:brightness-110 transition-all shadow-2xl shadow-brand-lime/10 active:scale-95"
-            >
-              Link Agency Key
-            </button>
-            <a 
-              href="https://ai.google.dev/gemini-api/docs/billing" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="block text-[10px] text-gray-600 hover:text-brand-lime underline uppercase tracking-[0.3em] transition-colors font-bold"
-            >
-              Billing Documentation
-            </a>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen gradient-bg relative text-white bg-[#050604] selection:bg-brand-lime/30">
@@ -316,12 +246,6 @@ function App() {
                         <p className="text-red-400 text-xs font-black uppercase tracking-[0.4em]">System Interruption</p>
                       </div>
                       <p className="text-red-400/90 text-sm leading-relaxed font-bold">{error}</p>
-                      <button 
-                        onClick={handleSelectKey}
-                        className="text-[11px] font-black uppercase tracking-widest bg-red-500/20 text-red-400 px-10 py-4 rounded-full border border-red-500/30 hover:bg-red-500/40 transition-all active:scale-95"
-                      >
-                        Reset Studio Key
-                      </button>
                     </div>
                   )}
                 </div>
