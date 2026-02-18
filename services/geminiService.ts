@@ -6,13 +6,14 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 /**
  * Creates a fresh AI client instance. 
+ * Invoked per-call to ensure the latest API key from the selection dialog is used.
  */
 const getAIClient = () => {
   return new GoogleGenAI({ apiKey: process.env.API_KEY });
 };
 
 /**
- * Wraps an API call with retry logic for 429 and 500 errors.
+ * Wraps an API call with retry logic for 429 (Rate Limit) and 500 (Server) errors.
  */
 const withRetry = async <T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> => {
   let lastError: any;
@@ -22,6 +23,7 @@ const withRetry = async <T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> =>
     } catch (err: any) {
       lastError = err;
       const errorMsg = err?.message || JSON.stringify(err);
+      // Retry on rate limits or transient server errors
       const isRetryable = errorMsg.includes('429') || errorMsg.includes('RESOURCE_EXHAUSTED') || errorMsg.includes('500');
       
       if (isRetryable && i < maxRetries - 1) {
@@ -45,52 +47,30 @@ export const generateAdCampaigns = async (
   const charBase64 = characterImageB64.split(',')[1] || characterImageB64;
   const styleBase64 = styleImageB64 ? (styleImageB64.split(',')[1] || styleImageB64) : null;
   
-  let referenceInstruction = `The user has selected the style: "${styleName}".`;
-  if (styleBase64) {
-    referenceInstruction += `
-      CRITICAL: A "Style Reference Image" has been provided. 
-      Analyze the second image for its SPECIFIC lighting, environment (place), color grading, and clothing/attire.
-      The generated ads MUST copy the style, place, and outfit aesthetic from the second image while keeping the exact facial character from the first image.
-    `;
-  }
-
-  const styleTriggers = `
-    - If style is 'Old Money': Equestrian, luxury library, preppy tailoring.
-    - If style is 'Cyberpunk': Neon teal/magenta, futuristic rain, high-tech urban.
-    - If style is 'Vogue Studio': High-contrast B&W, Chiaroscuro shadows.
-    - If style is 'Disposable Cam': 35mm film, direct flash, vintage grain.
-    - If style is 'Street Snap': Candid motion, urban blur, shot on iPhone.
-  `;
-
   const strategyPrompt = `
-    Act as a world-class High-Fashion Creative Director. 
-    1. Analyze the character in the FIRST image for brand DNA and facial identity.
-    2. ${styleBase64 ? "Analyze the SECOND image for visual style, location/setting, and fashion/attire." : "Follow the selected style aesthetic."}
-    3. Create 5 professional ad concepts.
-    
-    Instruction: ${referenceInstruction}
-    ${styleTriggers}
+    Act as a world-class High-Fashion Creative Director and Marketing Strategist. 
+    1. Deeply analyze the character in the FIRST image for unique brand DNA, facial features, and style.
+    2. Develop a premium influencer marketing strategy for this creator.
+    3. Generate 5 professional ad concepts optimized for high-conversion social feeds (Reels/TikTok).
+    4. The current collection theme is: "${styleName}". 
+    ${styleBase64 ? "MANDATORY: Mimic the EXACT lighting, background, and fashion vibe from the SECOND reference image in all ad visuals." : ""}
 
     Each concept must have:
     - 'title', 'platform', 'audience', 'hook', 'caption', 'visualConcept', 'tone'
-    - 'imagePrompt': Detailed technical prompt. If a style reference image was provided, ensure the prompt describes that exact environment and outfit style.
-    
-    Technical requirements for imagePrompt: "8k, professional photography, cinematic lighting, realistic skin textures, 9:16 aspect ratio".
-    CRITICAL: Preserve the character's face from the first image. Use the second image (if provided) for everything else (clothing, background, style).
+    - 'imagePrompt': A technical, descriptive prompt for an AI image generator. 
+    - Formatting requirements for imagePrompt: "9:16 vertical aspect ratio, high-end commercial fashion photography, cinematic lighting, shot on 8k digital camera, ultra-detailed skin textures, depth of field". 
+    - CHARACTER IDENTITY RULE: Explicitly state that the subject must look exactly like the person in the reference photo.
   `;
 
-  // Fix: Explicitly type parts as any[] to allow mixing text and inlineData objects
   const parts: any[] = [
     { inlineData: { mimeType: 'image/jpeg', data: charBase64 } },
   ];
-
   if (styleBase64) {
     parts.push({ inlineData: { mimeType: 'image/jpeg', data: styleBase64 } });
   }
-
-  // Fix: Now correctly pushes text part without TS inference error
   parts.push({ text: strategyPrompt });
 
+  // STEP 1: Strategic Reasoning using Gemini 3 Pro
   const strategyResponse: GenerateContentResponse = await withRetry(() => ai.models.generateContent({
     model: 'gemini-3-pro-preview',
     contents: { parts },
@@ -126,31 +106,30 @@ export const generateAdCampaigns = async (
   }));
 
   const strategyText = strategyResponse.text;
-  if (!strategyText) throw new Error("No response from Creative Strategy model.");
+  if (!strategyText) throw new Error("Agency strategy engine timed out.");
   const result = JSON.parse(strategyText) as AdGenerationResponse;
 
+  // STEP 2: Sequential High-Speed Asset Generation
   const campaignsWithImages: AdCampaign[] = [];
-  
   for (let i = 0; i < result.campaigns.length; i++) {
     onProgress(i);
     const campaign = result.campaigns[i];
+    
+    // Slight pause to prevent local rate limit spikes
     if (i > 0) await sleep(500);
 
     try {
-      // Fix: Explicitly type imgParts as any[] to allow mixing text and inlineData objects
       const imgParts: any[] = [
         { inlineData: { mimeType: 'image/jpeg', data: charBase64 } }
       ];
       if (styleBase64) {
         imgParts.push({ inlineData: { mimeType: 'image/jpeg', data: styleBase64 } });
       }
-      // Fix: Now correctly pushes text part without TS inference error
-      imgParts.push({ text: `GENERATE AD IMAGE: ${campaign.imagePrompt}. 
-        MANDATORY: Preserve the character identity from the first reference image. 
-        ${styleBase64 ? "COPY THE CLOTHING, SETTING, AND VISUAL STYLE EXACTLY FROM THE SECOND REFERENCE IMAGE." : ""}
-        Professional fashion advertising quality.` 
+      imgParts.push({ text: `TRANSFORM CHARACTER: ${campaign.imagePrompt}. 
+        Subject MUST be the same individual from reference photo 1. ${styleBase64 ? "Environment MUST match reference photo 2." : ""}` 
       });
 
+      // Gemini 2.5 Flash Image is the most stable and performant choice for Vercel
       const imageResponse: GenerateContentResponse = await withRetry(() => ai.models.generateContent({
         model: 'gemini-2.5-flash-image',
         contents: { parts: imgParts },
@@ -167,7 +146,7 @@ export const generateAdCampaigns = async (
         campaignsWithImages.push(campaign);
       }
     } catch (err) {
-      console.error(`Failed to generate image for campaign ${i}`, err);
+      console.error(`Creative asset #${i} failed`, err);
       campaignsWithImages.push(campaign);
     }
   }
@@ -186,20 +165,12 @@ export const generateSingleAdCampaign = async (
   const styleBase64 = styleImageB64 ? (styleImageB64.split(',')[1] || styleImageB64) : null;
 
   const strategyPrompt = `
-    Create ONE premium ad concept. Theme: "${styleName}". 
-    ${styleBase64 ? "Copy style, setting, and outfit from the SECOND reference image." : ""}
-    Preserve character identity from the FIRST reference.
-    Output JSON for one campaign object.
+    Create ONE boutique ad variation. Collection: "${styleName}". 
+    Return JSON for one campaign object matching the standard schema.
   `;
 
-  // Fix: Explicitly type parts as any[] to allow mixing text and inlineData objects
-  const parts: any[] = [
-    { inlineData: { mimeType: 'image/jpeg', data: charBase64 } }
-  ];
-  if (styleBase64) {
-    parts.push({ inlineData: { mimeType: 'image/jpeg', data: styleBase64 } });
-  }
-  // Fix: Now correctly pushes text part without TS inference error
+  const parts: any[] = [{ inlineData: { mimeType: 'image/jpeg', data: charBase64 } }];
+  if (styleBase64) parts.push({ inlineData: { mimeType: 'image/jpeg', data: styleBase64 } });
   parts.push({ text: strategyPrompt });
 
   const strategyResponse: GenerateContentResponse = await withRetry(() => ai.models.generateContent({
@@ -226,19 +197,13 @@ export const generateSingleAdCampaign = async (
   }));
 
   const text = strategyResponse.text;
-  if (!text) throw new Error("No response from Strategy model.");
+  if (!text) throw new Error("Variation strategy failed.");
   const campaign = JSON.parse(text) as AdCampaign;
   campaign.id = newId;
 
-  // Fix: Explicitly type imgParts as any[] to allow mixing text and inlineData objects
-  const imgParts: any[] = [
-    { inlineData: { mimeType: 'image/jpeg', data: charBase64 } }
-  ];
-  if (styleBase64) {
-    imgParts.push({ inlineData: { mimeType: 'image/jpeg', data: styleBase64 } });
-  }
-  // Fix: Now correctly pushes text part without TS inference error
-  imgParts.push({ text: `PROFESSIONAL AD: ${campaign.imagePrompt}. Reference character must be preserved.` });
+  const imgParts: any[] = [{ inlineData: { mimeType: 'image/jpeg', data: charBase64 } }];
+  if (styleBase64) imgParts.push({ inlineData: { mimeType: 'image/jpeg', data: styleBase64 } });
+  imgParts.push({ text: `RENDER VARIATION: ${campaign.imagePrompt}` });
 
   const imageResponse: GenerateContentResponse = await withRetry(() => ai.models.generateContent({
     model: 'gemini-2.5-flash-image',
