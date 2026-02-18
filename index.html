@@ -5,9 +5,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vin AI | Autonomous Creative Engine</title>
+    <!-- Favicon Data URI to prevent 404 on Vercel -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22%230d0e0c%22/><rect x=%220%22 y=%220%22 width=%2233%22 height=%22100%22 fill=%22%2394bd44%22/><rect x=%2233%22 y=%220%22 width=%2233%22 height=%22100%22 fill=%22%234d4d4d%22/><rect x=%2266%22 y=%220%22 width=%2234%22 height=%22100%22 fill=%22%238ba360%22/></svg>">
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       // Shim process for Vite/Vercel compatibility as per Gemini API requirements
+      // We ensure this is defined globally before any other scripts run.
       window.process = window.process || { env: {} };
       
       tailwind.config = {
@@ -26,7 +30,11 @@
         }
       }
     </script>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    
     <style>
         body {
             font-family: 'Inter', sans-serif;
