@@ -3,14 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vin AI | Autonomous Creative Engine</title>
-    <!-- Favicon Data URI to prevent 404 on Vercel -->
+    <title>Vin AI | Influencer Creative Engine</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22%230d0e0c%22/><rect x=%220%22 y=%220%22 width=%2233%22 height=%22100%22 fill=%22%2394bd44%22/><rect x=%2233%22 y=%220%22 width=%2233%22 height=%22100%22 fill=%22%234d4d4d%22/><rect x=%2266%22 y=%220%22 width=%2234%22 height=%22100%22 fill=%22%238ba360%22/></svg>">
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
-      // Shim process for Vite/Vercel compatibility as per Gemini API requirements.
-      // This MUST be defined before any other modules load.
       window.process = window.process || { env: {} };
       
       tailwind.config = {
@@ -24,6 +21,9 @@
                 cream: '#ecf0e5',
                 sage: '#8ba360',
               }
+            },
+            animation: {
+              'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
             }
           }
         }
@@ -40,48 +40,72 @@
             background-color: #050604;
             color: #ffffff;
             margin: 0;
+            overflow-x: hidden;
             -webkit-font-smoothing: antialiased;
         }
         .gradient-bg {
-            background: radial-gradient(circle at 50% 0%, rgba(148, 189, 68, 0.05) 0%, rgba(0, 0, 0, 0) 70%);
+            background: radial-gradient(circle at 50% 0%, rgba(148, 189, 68, 0.08) 0%, rgba(0, 0, 0, 0) 75%);
         }
-        @keyframes scale-in {
-          0% { transform: scale(0.95); opacity: 0; }
-          100% { transform: scale(1); opacity: 1; }
+        #boot-loader {
+            position: fixed;
+            inset: 0;
+            background: #050604;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1);
         }
-        .animate-scale-in {
-          animation: scale-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        .neural-pulse {
+            width: 60px;
+            height: 60px;
+            border: 2px solid rgba(148, 189, 68, 0.1);
+            border-top-color: #94bd44;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
         }
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 4px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-          background: rgba(255, 255, 255, 0.02);
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: rgba(148, 189, 68, 0.2);
-          border-radius: 10px;
-        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        /* Custom UI Elements */
         .glass-panel {
-          background: rgba(13, 14, 12, 0.7);
-          backdrop-filter: blur(20px);
-          -webkit-backdrop-filter: blur(20px);
+          background: rgba(13, 14, 12, 0.8);
+          backdrop-filter: blur(24px);
+          -webkit-backdrop-filter: blur(24px);
+          border: 1px solid rgba(255, 255, 255, 0.05);
         }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(148, 189, 68, 0.3); border-radius: 10px; }
+        
+        @keyframes scale-in {
+          from { transform: scale(0.98); opacity: 0; }
+          to { transform: scale(1); opacity: 1; }
+        }
+        .animate-scale-in { animation: scale-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
     </style>
+
 <script type="importmap">
 {
   "imports": {
-    "@google/genai": "https://esm.sh/@google/genai@^1.38.0",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "react": "https://esm.sh/react@^19.2.3"
+    "react": "https://esm.sh/react@19.0.0",
+    "react-dom": "https://esm.sh/react-dom@19.0.0",
+    "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
+    "react/jsx-runtime": "https://esm.sh/react@19.0.0/jsx-runtime",
+    "@google/genai": "https://esm.sh/@google/genai@1.38.0",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.48.1",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "react/": "https://esm.sh/react@^19.2.4/"
   }
 }
 </script>
 </head>
 <body>
+    <div id="boot-loader">
+        <div class="neural-pulse"></div>
+        <p style="margin-top: 32px; font-size: 11px; font-weight: 900; letter-spacing: 0.6em; text-transform: uppercase; color: #94bd44; opacity: 0.8;">Syncing Creative Core</p>
+    </div>
     <div id="root"></div>
-    <!-- The entry point is critical for Vite to build the application -->
     <script type="module" src="./index.tsx"></script>
 </body>
 </html>
