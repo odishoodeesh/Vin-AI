@@ -4,9 +4,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vin AI</title>
+    <title>Vin AI | Autonomous Creative Engine</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
+      // Shim process for Vite/Vercel compatibility as per Gemini API requirements
+      window.process = window.process || { env: {} };
+      
       tailwind.config = {
         theme: {
           extend: {
@@ -27,25 +30,35 @@
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #0d0e0c;
+            background-color: #050604;
             color: #ffffff;
+            margin: 0;
+            -webkit-font-smoothing: antialiased;
         }
         .gradient-bg {
-            background: radial-gradient(circle at 50% 0%, rgba(148, 189, 68, 0.08) 0%, rgba(0, 0, 0, 0) 70%);
+            background: radial-gradient(circle at 50% 0%, rgba(148, 189, 68, 0.05) 0%, rgba(0, 0, 0, 0) 70%);
         }
         @keyframes scale-in {
-          0% { transform: scale(0.9); opacity: 0; }
+          0% { transform: scale(0.95); opacity: 0; }
           100% { transform: scale(1); opacity: 1; }
         }
         .animate-scale-in {
-          animation: scale-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.1) forwards;
+          animation: scale-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
-        .logo-stripe {
-          display: flex;
-          height: 100%;
-          width: 100%;
-          border-radius: 0.5rem;
-          overflow: hidden;
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: rgba(255, 255, 255, 0.02);
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(148, 189, 68, 0.2);
+          border-radius: 10px;
+        }
+        .glass-panel {
+          background: rgba(13, 14, 12, 0.7);
+          backdrop-filter: blur(20px);
+          -webkit-backdrop-filter: blur(20px);
         }
     </style>
 <script type="importmap">
